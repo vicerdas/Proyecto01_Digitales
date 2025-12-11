@@ -1,0 +1,28 @@
+Creación de compilación para el bubble sort
+se crea "nano build_bubble1.sh"
+Contiene:
+#!/bin/bash
+source ./riscv_tools_setup.sh
+
+echo "Compilando bubble1.cpp para RISC-V 32 bits"
+
+# Generar ensamblador
+riscv32-unknown-elf-g++ -S bubble1.cpp -o bubble1.s // Comando Linux necesarios
+
+# Generar ELF
+riscv32-unknown-elf-g++ bubble1.cpp -o bubble1.elf
+
+# Convertir a binario
+riscv32-unknown-elf-objcopy -O binary bubble1.elf bubble1.bin
+
+echo "Archivos generados:"
+echo "  bubble1.s"
+echo "  bubble1.elf"
+echo "  bubble1.bin"
+
+Se ejecutó con:
+chmod +x build_bubble1.sh
+./build_bubble1.sh
+
+
+
