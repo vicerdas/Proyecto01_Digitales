@@ -1,0 +1,110 @@
+#!/bin/bash
+cd /mnt/vol_NFS_rh003/Est_Digitales_2S_2025/vcerdas/vcerdas2
+
+echo "=== CONFIGURANDO HERRAMIENTAS RISC-V ==="
+
+# RUTA CORRECTA a TUS herramientas
+RISCV_TOOLS="$(pwd)/tools_riscv"
+
+# Verificar que existe la carpeta bin
+if [ ! -d "$RISCV_TOOLS/bin" ]; then
+    echo "❌ ERROR: No se encuentra $RISCV_TOOLS/bin"
+    echo "Contenido de $(pwd):"
+    ls -la
+    exit 1
+fi
+
+echo "Herramientas en: $RISCV_TOOLS"
+echo "Archivos en bin:"
+ls "$RISCV_TOOLS/bin/" | head -5
+
+# Configurar PATH
+export PATH="$RISCV_TOOLS/bin:$PATH"
+export RISCV="$RISCV_TOOLS"
+
+echo ""
+echo "=== VERIFICANDO HERRAMIENTAS ==="
+which riscv32-unknown-elf-as || echo "⚠ as no encontrado"
+which riscv32-unknown-elf-gcc || echo "⚠ gcc no encontrado"
+which riscv32-unknown-elf-ld || echo "⚠ ld no encontrado"
+which riscv32-unknown-elf-objdump || echo "⚠ objdump no encontrado"
+
+echo ""
+echo "=== COMPILANDO SNAKE ==="
+
+# 1. Ensamblar
+echo "1. Ensamblando snake.s..."
+riscv32-unknown-elf-as -march=rv32im snake.s -o snake.o
+
+if [ $? -ne 0 ]; then
+    echo "❌ Error al ensamblar"
+    exit 1
+fi
+echo "✓ snake.o creado ($(ls -lh snake.o | awk '{print $5}'))"
+
+# 2. Enlazar (forma SIMPLE que siempre funciona)
+echo ""
+echo "2. Enlazando..."
+riscv32-unknown-elf-ld -e _start -Ttext 0x00000000 snake.o -o snake.elf
+
+if [ $? -ne 0 ]; then
+    echo "⚠ Probando método alternativo..."
+    # Si falla, probar con secciones de datos
+    riscv32-unknown-elf-ld -e _start -Ttext 0x00000000 -Tdata 0x00001000 snake.o -o snake.elf
+fi
+
+if [ $? -eq 0 ]; then
+    echo "✓ snake.elf creado ($(ls -lh snake.elf | awk '{print $5}'))"
+else
+    echo "❌ Error al enlazar"
+    exit 1
+fi
+
+# 3. Generar .hex
+echo ""
+echo "3. Generando snake.hex..."
+
+# Método 1: usando elf2hex si existe
+if [ -f "$RISCV_TOOLS/bin/riscv32-unknown-elf-elf2hex" ]; then
+    echo "Usando elf2hex..."
+    riscv32-unknown-elf-elf2hex --bit-width 32 --input snake.elf > snake.hex
+else
+    # Método 2: manual (siempre funciona)
+    echo "Generando manualmente..."
+    
+    # Crear dump
+    riscv32-unknown-elf-objdump -d snake.elf > snake.dump
+    
+    # Extraer instrucciones y crear .hex
+    echo "@00000000" > snake.hex
+    grep "^[[:space:]]*[0-9a-f]\+:" snake.dump | awk '{print $2}' >> snake.hex
+    
+    echo "✓ snake.dump también creado"
+fi
+
+# Verificar resultado
+if [ -s snake.hex ]; then
+    echo "✓ snake.hex creado con $(wc -l < snake.hex) líneas"
+    echo ""
+    echo "=== MUESTRA DEL RESULTADO ==="
+    echo "Primeras 10 líneas de snake.hex:"
+    head -10 snake.hex
+    echo ""
+    echo "Últimas 5 líneas:"
+    tail -5 snake.hex
+else
+    echo "⚠ snake.hex está vacío o no se creó"
+    
+    # Intentar método de emergencia
+    echo "Usando método de emergencia..."
+    riscv32-unknown-elf-objcopy -O binary snake.elf snake.bin
+    if [ -s snake.bin ]; then
+        echo "@00000000" > snake.hex
+        hexdump -v -e '1/4 "%08x\n"' snake.bin >> snake.hex
+        echo "✓ snake.hex creado desde binario"
+    fi
+fi
+
+echo ""
+echo "=== RESUMEN FINAL ==="
+ls -la snake.o snake.elf snake.hex 2>/dev/null || echo "Algunos archivos no se crearon"
