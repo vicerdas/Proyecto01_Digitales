@@ -1,0 +1,86 @@
+#!/bin/bash
+cd /mnt/vol_NFS_rh003/Est_Digitales_2S_2025/vcerdas/vcerdas2
+
+echo "=== CONVERSIÓN HEX A BIN ==="
+echo ""
+
+# Configurar PATH 
+export PATH="$(pwd)/tools_riscv/bin:$PATH"
+
+# Verificar que existe snake.hex
+if [ ! -f "snake.hex" ]; then
+    echo "ERROR: No se encuentra snake.hex"
+    echo "Archivos disponibles:"
+    ls -la *.hex 2>/dev/null || echo "No hay archivos .hex"
+    exit 1
+fi
+
+echo "snake.hex encontrado ($(wc -l < snake.hex) líneas)"
+
+# Método 1: Si el hex tiene formato @address
+if head -1 snake.hex | grep -q "^@"; then
+    echo "Formato detectado: Hex con direcciones (@...)"
+    
+    # Quitar la línea de dirección y espacios
+    tail -n +2 snake.hex | sed 's/[[:space:]]//g' > snake.hex.clean
+    
+    # Contar bytes
+    BYTE_COUNT=$(wc -l < snake.hex.clean)
+    echo "Instrucciones: $BYTE_COUNT"
+    
+    # Convertir a binario
+    echo "Convirtiendo a snake.bin..."
+    while read line; do
+        # Convertir cada palabra de 32 bits (8 caracteres hex)
+        echo "$line" | sed 's/\(..\)\(..\)\(..\)\(..\)/\4\3\2\1/' | xxd -r -p
+    done < snake.hex.clean > snake.bin
+    
+    rm -f snake.hex.clean
+    
+# Método 2: Si es solo hex puro
+else
+    echo "Formato detectado: Hex puro"
+    
+    # Limpiar espacios y saltos
+    cat snake.hex | tr -d '[:space:]' > snake.hex.clean
+    
+    # Verificar longitud
+    LENGTH=$(wc -c < snake.hex.clean)
+    echo "Caracteres hex: $LENGTH"
+    
+    # Convertir
+    echo "Convirtiendo a snake.bin..."
+    cat snake.hex.clean | xxd -r -p > snake.bin
+    
+    rm -f snake.hex.clean
+fi
+
+# Verificar resultado
+if [ -s "snake.bin" ]; then
+    echo ""
+    echo "CONVERSIÓN EXITOSA"
+    echo "snake.bin creado: $(ls -lh snake.bin | awk '{print $5}')"
+    echo "Tamaño: $(wc -c < snake.bin) bytes"
+    
+    echo ""
+    echo "=== INFORMACIÓN DEL BINARIO ==="
+    echo "Primeros 32 bytes (hexdump):"
+    hexdump -C snake.bin | head -5
+    
+    echo ""
+    echo "Para ver todo: hexdump -C snake.bin | less"
+else
+    echo "ERROR: snake.bin está vacío o no se creó"
+    
+    # Intentar método alternativo usando objcopy
+    echo "Probando método alternativo..."
+    if [ -f "snake.elf" ]; then
+        riscv32-unknown-elf-objcopy -O binary snake.elf snake.bin
+        echo "snake.bin creado desde snake.elf"
+        ls -lh snake.bin
+    fi
+fi
+
+echo ""
+echo "=== ARCHIVOS FINALES ==="
+ls -la snake.hex snake.bin snake.elf 2>/dev/null | grep -v ".dump$"
