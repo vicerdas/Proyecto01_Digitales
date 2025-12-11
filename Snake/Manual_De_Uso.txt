@@ -1,0 +1,14 @@
+Instrucciones para ejecutar el snake
+1. Abrir el archivo .s en RIPES
+2. Inicial la simulación
+3. El Snake va a iniciar automáticamente moviéndose hacia arriba.
+4. Para cambiar su dirección, mantener ligeramente presionado 
+la dirección del pad a donde se quiere mover un poco antes de que 
+el 'led' de la culebra desaparezca y vuelva a aparecer.
+Ella se va a quedar moviéndose a esa dirección hasta que se vuelva a cambiar.
+
+Información:
+Al llegar a un borde,
+el juego termina, el juego termina también sí se choca contra usted 
+mismo.
+La serpiente crece una unidad por cada manzana comida.
